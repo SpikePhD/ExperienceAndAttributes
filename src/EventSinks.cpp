@@ -106,16 +106,23 @@ namespace EA::EventSinks {
             // chaining multiple level-ups one per engine cycle with full vanilla UI.
             if (stat == "Level Increases") {
                 logger::info("[EA] TrackedStat: Level Increases = {}. "
-                             "Engine finished level-up. Clearing in-progress flag. "
-                             "Pending: {}",
+                             "Scheduling deferred FirePendingLevelUp for next tick. Pending: {}",
                              event->value,
                              EA::XPManager::GetPendingLevelUps());
 
-                // Clear the flag FIRST so FirePendingLevelUp is unblocked.
+                // Clear the flag now — the engine confirmed the level-up is done.
                 EA::XPManager::SetLevelUpInProgress(false);
 
-                // Then fire the next pending level-up if any.
-                EA::XPManager::FirePendingLevelUp();
+                // Defer the next trigger by one tick so the engine finishes resetting
+                // skills->data->xp and levelThreshold before we write again.
+                // Without this defer, "Level Increases" fires before the bucket is
+                // cleared, making the second TriggerLevelUp a silent no-op (100=100).
+                SKSE::GetTaskInterface()->AddTask([]() {
+                    logger::info("[EA] DeferredTask: Firing pending level-up from task queue. "
+                                 "Pending: {}", EA::XPManager::GetPendingLevelUps());
+                    EA::XPManager::FirePendingLevelUp();
+                });
+
                 return RE::BSEventNotifyControl::kContinue;
             }
 

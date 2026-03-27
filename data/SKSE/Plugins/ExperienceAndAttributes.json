@@ -61,9 +61,9 @@
   },
 
   "leveling": {
-    "xp_base":     200.0,
-    "xp_increase":  25.0,
-    "xp_cap":     1000.0,
+    "xp_base":     5.0,
+    "xp_increase": 1.0,
+    "xp_cap":      1000.0,
     "_comment": "XP to next level = min(xp_cap, xp_base + (current_level * xp_increase)). Cap prevents leveling becoming a chore at high levels."
   }
 }

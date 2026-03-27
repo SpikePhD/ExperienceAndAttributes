@@ -60,18 +60,31 @@ namespace {
         auto logFilename = std::format("ExperienceAndAttributes_{}.log", ts.str());
         auto logPath     = spikeDir / logFilename;
 
-        // Set up spdlog with the timestamped file
-        auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(), true);
-        auto log  = std::make_shared<spdlog::logger>("EA", std::move(sink));
+        // Mirror sink: project Logs folder for direct access during development
+        auto projectLogDir = std::filesystem::path(
+            "C:/Users/lucac/Documents/MyProjects/Experience and Attributes/Logs");
+        std::filesystem::create_directories(projectLogDir);
+        auto projectLogPath = projectLogDir / logFilename;
+
+        // Combine both sinks into a dist_sink
+        auto sink1    = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(),        true);
+        auto sink2    = std::make_shared<spdlog::sinks::basic_file_sink_mt>(projectLogPath.string(), true);
+        auto distSink = std::make_shared<spdlog::sinks::dist_sink_mt>();
+        distSink->add_sink(sink1);
+        distSink->add_sink(sink2);
+
+        auto log = std::make_shared<spdlog::logger>("EA", distSink);
         log->set_level(spdlog::level::trace);
         log->flush_on(spdlog::level::trace);
         spdlog::set_default_logger(std::move(log));
 
-        // Log rotation: delete oldest EA session logs if over the limit
+        // Log rotation: delete oldest EA session logs if over the limit.
+        // Applied to both the SKSE Spike folder and the project Logs folder.
         int maxFiles = ReadMaxLogFiles();
-        if (maxFiles > 0) {
+        auto rotateDir = [&](const std::filesystem::path& dir) {
+            if (maxFiles <= 0) return;
             std::vector<std::filesystem::path> logFiles;
-            for (const auto& entry : std::filesystem::directory_iterator(spikeDir)) {
+            for (const auto& entry : std::filesystem::directory_iterator(dir)) {
                 if (!entry.is_regular_file()) continue;
                 auto name = entry.path().filename().string();
                 if (name.starts_with("ExperienceAndAttributes_") && name.ends_with(".log")) {
@@ -85,7 +98,9 @@ namespace {
                 std::filesystem::remove(logFiles.front(), ec);
                 logFiles.erase(logFiles.begin());
             }
-        }
+        };
+        rotateDir(spikeDir);
+        rotateDir(projectLogDir);
     }
 
     // -----------------------------------------------------------------------

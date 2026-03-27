@@ -5,6 +5,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/dist_sink.h>
 
 #include <unordered_set>
 
