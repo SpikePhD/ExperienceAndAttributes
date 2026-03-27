@@ -143,8 +143,15 @@ namespace {
                 logger::info("[EA] Cosave: Loaded XP={:.1f}, trackedLevel={}, pending={}.",
                              xp, level, pending);
 
-                // Fire one pending level-up now if any were queued before the save.
-                EA::XPManager::FirePendingLevelUp();
+                // Restart the chain if level-ups were pending at save time.
+                // FirePendingLevelUp triggers TriggerLevelUp once; the engine then
+                // fires "Level Increases" which chains the rest via EventSinks.
+                if (EA::XPManager::GetPendingLevelUps() > 0) {
+                    logger::info("[EA] Cosave: {} pending level-up(s) found on load. "
+                                 "Resuming chain.",
+                                 EA::XPManager::GetPendingLevelUps());
+                    EA::XPManager::FirePendingLevelUp();
+                }
             } else {
                 logger::warn("[EA] Cosave: Unknown record type {:#010x} — skipped.", type);
             }

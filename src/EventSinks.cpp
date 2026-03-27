@@ -100,6 +100,18 @@ namespace EA::EventSinks {
                 return RE::BSEventNotifyControl::kContinue;
             }
 
+            // "Level Increases" fires after the engine fully completes a level-up
+            // (attribute screen confirmed, perk point awarded, level incremented).
+            // We use this as the signal to fire the next pending level-up, if any,
+            // chaining multiple level-ups one per engine cycle with full vanilla UI.
+            if (stat == "Level Increases") {
+                logger::info("[EA] TrackedStat: Level Increases = {}. "
+                             "Checking for pending level-ups (pending={}).",
+                             event->value, EA::XPManager::GetPendingLevelUps());
+                EA::XPManager::FirePendingLevelUp();
+                return RE::BSEventNotifyControl::kContinue;
+            }
+
             // Kill stats: logged for cross-reference; XP via TESDeathEvent with
             // per-actor FormID deduplication guard.
             if (stat == "People Killed"    || stat == "Animals Killed"  ||
@@ -228,6 +240,26 @@ namespace EA::EventSinks {
     };
 
     // -----------------------------------------------------------------------
+    // ATTRIBUTE TRACKING — TESActorValueChangeEvent
+    //
+    // NOTE: TESActorValueChangeEvent has NO struct definition in this build of
+    // CommonLibSSE-NG (checked include/RE/T/ — file does not exist). The event
+    // is absent from ScriptEventSourceHolder's BSTEventSource base list.
+    // Sink is commented out; attribute selection is NOT tracked this build.
+    // -----------------------------------------------------------------------
+    // struct OnActorValueChange : public RE::BSTEventSink<RE::TESActorValueChangeEvent> { ... };
+
+    // -----------------------------------------------------------------------
+    // PERK TRACKING — TESPerkEntryRunEvent
+    //
+    // NOTE: TESPerkEntryRunEvent IS forward-declared in ScriptEventSourceHolder.h
+    // and SkyrimVM.h, but has NO struct definition in this CommonLibSSE-NG build
+    // (no RE/T/TESPerkEntryRunEvent.h exists). Field access (perkId, target) is
+    // therefore impossible. Sink is commented out; perk selection NOT tracked.
+    // -----------------------------------------------------------------------
+    // struct OnPerkEntry : public RE::BSTEventSink<RE::TESPerkEntryRunEvent> { ... };
+
+    // -----------------------------------------------------------------------
     // Static instances
     // -----------------------------------------------------------------------
     static OnTrackedStats s_trackedStatsSink;
@@ -252,6 +284,16 @@ namespace EA::EventSinks {
         src->GetEventSource<RE::TESQuestStageEvent>()->AddEventSink(&s_questSink);
         logger::info("[EA] EventSinks: [3/3] TESQuestStageEvent registered.");
 
-        logger::info("[EA] EventSinks: All sinks registered.");
+        // TESActorValueChangeEvent: no struct definition in this CommonLibSSE-NG build.
+        logger::warn("[EA] EventSinks: TESActorValueChangeEvent sink SKIPPED — "
+                     "struct not defined in this CommonLibSSE-NG build. "
+                     "Attribute selection will not be logged.");
+
+        // TESPerkEntryRunEvent: forward-declared only, no field access possible.
+        logger::warn("[EA] EventSinks: TESPerkEntryRunEvent sink SKIPPED — "
+                     "struct forward-declared only, no field definitions available. "
+                     "Perk selection will not be logged.");
+
+        logger::info("[EA] EventSinks: All sinks registered (3/3 active, 2/2 diagnostic sinks skipped).");
     }
 }

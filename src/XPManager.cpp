@@ -93,10 +93,33 @@ namespace EA::XPManager {
             logger::error("[EA] TriggerLevelUp: PlayerSkills or data is null — level-up FAILED.");
             return;
         }
+
+        // Read state BEFORE the write
+        int   levelBefore     = static_cast<int>(player->GetLevel());
+        float xpBefore        = skills->data->xp;
+        float thresholdBefore = skills->data->levelThreshold;
+
+        // Trigger the level-up
         skills->data->xp = skills->data->levelThreshold;
-        logger::info("[EA] TriggerLevelUp: XP bucket set to threshold ({:.1f}). "
-                     "Vanilla level-up will fire on next engine tick.",
-                     static_cast<float>(skills->data->levelThreshold));
+
+        // Read state AFTER the write
+        int   levelAfter = static_cast<int>(player->GetLevel());
+        float xpAfter    = skills->data->xp;
+
+        logger::info("[EA] TriggerLevelUp: "
+                     "player->GetLevel() before={} after={} | "
+                     "skills->data->xp before={:.1f} after={:.1f} | "
+                     "levelThreshold={:.1f}",
+                     levelBefore, levelAfter,
+                     xpBefore, xpAfter,
+                     thresholdBefore);
+
+        if (levelAfter > levelBefore) {
+            logger::info("[EA] TriggerLevelUp: SUCCESS — engine immediately advanced level.");
+        } else {
+            logger::info("[EA] TriggerLevelUp: DEFERRED — level not yet updated "
+                         "(engine will process on next tick).");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -147,11 +170,6 @@ namespace EA::XPManager {
             return;
         }
 
-        // Fire any previously queued level-up BEFORE processing new XP.
-        // This delivers level-ups one per XP event so the vanilla UI
-        // handles each one cleanly on a separate frame.
-        FirePendingLevelUp();
-
         s_currentXP += amount;
         float threshold = GetXPThreshold(s_trackedLevel);
 
@@ -179,14 +197,27 @@ namespace EA::XPManager {
                          localLevel, s_currentXP, threshold, s_pendingLevelUps);
         }
 
-        // Fire the first newly queued level-up immediately.
-        // Any remaining pending ones fire at the start of the next AwardXP call.
-        FirePendingLevelUp();
+        // Fire ONE level-up now to start the chain.
+        // Subsequent ones fire when the engine confirms each level via the
+        // "Level Increases" TrackedStat event caught in EventSinks.cpp.
+        if (s_pendingLevelUps > 0) {
+            FirePendingLevelUp();
+        }
 
         logger::info("[EA] XP progress: {:.1f} / {:.1f} ({:.1f}% to next) | "
                      "TrackedLevel: {} | Pending: {}",
             s_currentXP, GetXPThreshold(s_trackedLevel),
             (s_currentXP / GetXPThreshold(s_trackedLevel)) * 100.0f,
             s_trackedLevel, s_pendingLevelUps);
+
+        // Ground-truth snapshot: compare engine state vs our tracked state.
+        // If GetLevel() consistently diverges from s_trackedLevel, the engine
+        // is not accepting our TriggerLevelUp writes.
+        logger::info("[EA] PlayerState: GetLevel()={} s_trackedLevel={} "
+                     "s_pendingLevelUps={} s_currentXP={:.1f}",
+                     static_cast<int>(player->GetLevel()),
+                     s_trackedLevel,
+                     s_pendingLevelUps,
+                     s_currentXP);
     }
 }
