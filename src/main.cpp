@@ -108,23 +108,16 @@ namespace {
     // -----------------------------------------------------------------------
 
     constexpr std::uint32_t kEASaveID  = 'EAXP';
-    constexpr std::uint32_t kEAVersion = 2;  // v2: adds trackedLevel + pendingLevelUps
+    constexpr std::uint32_t kEAVersion = 3;  // v3: xp only (trackedLevel + pendingLevelUps removed)
 
     void OnGameSave(SKSE::SerializationInterface* intfc) {
         if (!intfc->OpenRecord(kEASaveID, kEAVersion)) {
             logger::error("[EA] Cosave: Failed to open write record.");
             return;
         }
-        float xp      = EA::XPManager::GetCurrentXP();
-        int   level   = EA::XPManager::GetTrackedLevel();
-        int   pending = EA::XPManager::GetPendingLevelUps();
-
-        intfc->WriteRecordData(&xp,      sizeof(xp));
-        intfc->WriteRecordData(&level,   sizeof(level));
-        intfc->WriteRecordData(&pending, sizeof(pending));
-
-        logger::info("[EA] Cosave: Saved XP={:.1f}, trackedLevel={}, pending={}.",
-                     xp, level, pending);
+        float xp = EA::XPManager::GetCurrentXP();
+        intfc->WriteRecordData(&xp, sizeof(xp));
+        logger::info("[EA] Cosave: Saved XP={:.1f}.", xp);
     }
 
     void OnGameLoad(SKSE::SerializationInterface* intfc) {
@@ -132,53 +125,40 @@ namespace {
         // are invalid in the new save's worldspace.
         EA::XPManager::ResetKillGuard();
         EA::XPManager::ResetQuestGuard();
-        EA::XPManager::SetLevelUpInProgress(false);
 
         std::uint32_t type, version, length;
         while (intfc->GetNextRecordInfo(type, version, length)) {
             if (type == kEASaveID) {
-                float xp      = 0.0f;
-                int   level   = 1;
-                int   pending = 0;
-
+                float xp = 0.0f;
                 intfc->ReadRecordData(&xp, sizeof(xp));
-
-                if (version >= 2) {
-                    intfc->ReadRecordData(&level,   sizeof(level));
-                    intfc->ReadRecordData(&pending, sizeof(pending));
-                } else {
-                    // Upgrading from v1 cosave: initialize level from the game.
-                    auto* player = RE::PlayerCharacter::GetSingleton();
-                    level = player ? static_cast<int>(player->GetLevel()) : 1;
-                }
+                // v1/v2 cosaves had additional fields (trackedLevel, pendingLevelUps)
+                // after xp — they are intentionally not read; the engine is now
+                // authoritative for level state.
 
                 EA::XPManager::SetCurrentXP(xp);
-                EA::XPManager::SetTrackedLevel(level);
-                EA::XPManager::SetPendingLevelUps(pending);
 
-                logger::info("[EA] Cosave: Loaded XP={:.1f}, trackedLevel={}, pending={}.",
-                             xp, level, pending);
-
-                // Restart the chain if level-ups were pending at save time.
-                // FirePendingLevelUp triggers TriggerLevelUp once; the engine then
-                // fires "Level Increases" which chains the rest via EventSinks.
-                if (EA::XPManager::GetPendingLevelUps() > 0) {
-                    logger::info("[EA] Cosave: {} pending level-up(s) found on load. "
-                                 "Resuming chain.",
-                                 EA::XPManager::GetPendingLevelUps());
-                    EA::XPManager::FirePendingLevelUp();
+                // Restore the XP into the engine's bucket.
+                // skills->data->xp was reset to 0 by the engine on load,
+                // so we write our saved value back directly.
+                auto* player = RE::PlayerCharacter::GetSingleton();
+                if (player) {
+                    auto* skills = player->GetInfoRuntimeData().skills;
+                    if (skills && skills->data) {
+                        skills->data->xp = xp;
+                        skills->data->levelThreshold =
+                            std::min(skills->data->levelThreshold, EA::Config::xpCap);
+                    }
                 }
+
+                logger::info("[EA] Cosave: Loaded XP={:.1f}.", xp);
             } else {
-                logger::warn("[EA] Cosave: Unknown record type {:#010x} — skipped.", type);
+                logger::warn("[EA] Cosave: Unknown record {:#010x} — skipped.", type);
             }
         }
     }
 
     void OnGameRevert(SKSE::SerializationInterface*) {
         EA::XPManager::SetCurrentXP(0.0f);
-        EA::XPManager::SetTrackedLevel(1);
-        EA::XPManager::SetPendingLevelUps(0);
-        EA::XPManager::SetLevelUpInProgress(false);
         EA::XPManager::ResetKillGuard();
         EA::XPManager::ResetQuestGuard();
         logger::info("[EA] Cosave: Reverted — all state reset.");
@@ -191,14 +171,38 @@ namespace {
         EA::SkillHook::Install();
         EA::EventSinks::Register();
 
-        // Sync our level tracker with the game's current level.
-        // This is the correct starting point for a fresh new game.
-        // For a loaded save, OnGameLoad fires shortly after and overwrites this.
+        // Set vanilla leveling game settings to match our config curve.
+        // The engine uses: threshold = fXPLevelUpBase + (level * fXPLevelUpMult)
+        // This is identical to our old formula — now the engine computes it natively.
+        auto* settings = RE::GameSettingCollection::GetSingleton();
+        if (settings) {
+            auto* base = settings->GetSetting("fXPLevelUpBase");
+            auto* mult = settings->GetSetting("fXPLevelUpMult");
+            if (base) {
+                base->data.f = EA::Config::xpBase;
+                logger::info("[EA] OnDataLoaded: fXPLevelUpBase set to {:.1f}.", EA::Config::xpBase);
+            } else {
+                logger::warn("[EA] OnDataLoaded: fXPLevelUpBase not found in GameSettingCollection.");
+            }
+            if (mult) {
+                mult->data.f = EA::Config::xpIncrease;
+                logger::info("[EA] OnDataLoaded: fXPLevelUpMult set to {:.1f}.", EA::Config::xpIncrease);
+            } else {
+                logger::warn("[EA] OnDataLoaded: fXPLevelUpMult not found in GameSettingCollection.");
+            }
+        } else {
+            logger::warn("[EA] OnDataLoaded: GameSettingCollection is null — leveling curve NOT applied.");
+        }
+
+        // Clamp the current level's threshold in case we are loading into a save
+        // where the vanilla formula result exceeds our configured cap.
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (player) {
-            int gameLevel = static_cast<int>(player->GetLevel());
-            EA::XPManager::SetTrackedLevel(gameLevel);
-            logger::info("[EA] OnDataLoaded: s_trackedLevel initialized to {}.", gameLevel);
+            auto* skills = player->GetInfoRuntimeData().skills;
+            if (skills && skills->data) {
+                skills->data->levelThreshold =
+                    std::min(skills->data->levelThreshold, EA::Config::xpCap);
+            }
         }
 
         logger::info("[EA] All systems initialised and ready.");

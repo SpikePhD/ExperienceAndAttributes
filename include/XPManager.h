@@ -2,35 +2,13 @@
 
 namespace EA::XPManager {
 
-    // Awards XP from a named source, queues level-ups, fires HUD notification.
+    // Awards XP from a named source. Feeds directly into the engine's native
+    // XP bucket — the engine handles level-up UI, perk points, and overflow carry.
     void AwardXP(float amount, std::string_view source);
-
-    // Returns the XP threshold needed to level up from a given level.
-    float GetXPThreshold(int playerLevel);
-
-    // Fires ONE pending level-up if any are queued.
-    // Call on game load and within AwardXP for deferred delivery.
-    void FirePendingLevelUp();
 
     // Cosave accessors.
     float GetCurrentXP();
     void  SetCurrentXP(float xp);
-
-    // Our own level tracker — independent of player->GetLevel().
-    // Initialized from the game on first load; incremented on each level-up.
-    int  GetTrackedLevel();
-    void SetTrackedLevel(int level);
-
-    // Pending level-up counter — persisted in cosave so level-ups queued
-    // before a save are still delivered after reload.
-    int  GetPendingLevelUps();
-    void SetPendingLevelUps(int count);
-
-    // Level-up in-progress flag.
-    // True between TriggerLevelUp and the "Level Increases" TrackedStat event.
-    // Prevents writing to the XP bucket while the engine is processing a level-up.
-    bool GetLevelUpInProgress();
-    void SetLevelUpInProgress(bool val);
 
     // Kill deduplication guard.
     // Returns true if this is a new kill (XP should be awarded).

@@ -105,23 +105,24 @@ namespace EA::EventSinks {
             // We use this as the signal to fire the next pending level-up, if any,
             // chaining multiple level-ups one per engine cycle with full vanilla UI.
             if (stat == "Level Increases") {
-                logger::info("[EA] TrackedStat: Level Increases = {}. "
-                             "Scheduling deferred FirePendingLevelUp for next tick. Pending: {}",
+                auto* player = RE::PlayerCharacter::GetSingleton();
+                if (!player) return RE::BSEventNotifyControl::kContinue;
+
+                auto* skills = player->GetInfoRuntimeData().skills;
+                if (!skills || !skills->data) return RE::BSEventNotifyControl::kContinue;
+
+                // Clamp levelThreshold to xp_cap so leveling never stalls at a
+                // value above the cap. The engine already updated the threshold for
+                // the new level; we only clamp if the formula result exceeds the cap.
+                float uncapped = skills->data->levelThreshold;
+                float capped   = std::min(uncapped, EA::Config::xpCap);
+                skills->data->levelThreshold = capped;
+
+                logger::info("[EA] Level Increases = {} | GetLevel()={} | "
+                             "threshold: {:.1f} -> {:.1f} (cap={:.1f})",
                              event->value,
-                             EA::XPManager::GetPendingLevelUps());
-
-                // Clear the flag now — the engine confirmed the level-up is done.
-                EA::XPManager::SetLevelUpInProgress(false);
-
-                // Defer the next trigger by one tick so the engine finishes resetting
-                // skills->data->xp and levelThreshold before we write again.
-                // Without this defer, "Level Increases" fires before the bucket is
-                // cleared, making the second TriggerLevelUp a silent no-op (100=100).
-                SKSE::GetTaskInterface()->AddTask([]() {
-                    logger::info("[EA] DeferredTask: Firing pending level-up from task queue. "
-                                 "Pending: {}", EA::XPManager::GetPendingLevelUps());
-                    EA::XPManager::FirePendingLevelUp();
-                });
+                             static_cast<int>(player->GetLevel()),
+                             uncapped, capped, EA::Config::xpCap);
 
                 return RE::BSEventNotifyControl::kContinue;
             }

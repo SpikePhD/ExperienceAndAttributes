@@ -61,9 +61,13 @@
   },
 
   "leveling": {
-    "xp_base":     5.0,
-    "xp_increase": 1.0,
-    "xp_cap":      1000.0,
-    "_comment": "XP to next level = min(xp_cap, xp_base + (current_level * xp_increase)). Cap prevents leveling becoming a chore at high levels."
+    "xp_base":     75.0,
+    "xp_increase": 25.0,
+    "xp_cap":      500.0,
+    "_comment": "xp_base maps to fXPLevelUpBase, xp_increase to fXPLevelUpMult.",
+    "_comment_formula": "threshold(level) = min(xp_cap, xp_base + level * xp_increase)",
+    "_comment_vanilla": "Vanilla defaults: xp_base=75, xp_increase=25 (no cap).",
+    "_comment_cap": "xp_cap clamps the threshold so leveling never becomes a chore at high levels.",
+    "_comment_testing": "For fast testing use xp_base=5, xp_increase=1, xp_cap=1000."
   }
 }
