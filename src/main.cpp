@@ -27,7 +27,7 @@ namespace {
     // On any failure returns the default (10) silently.
     int ReadMaxLogFiles() {
         try {
-            auto configPath = GetPluginsDir() / "ExperienceAndAttributes.json";
+            auto configPath = GetPluginsDir() / "SimpleAlternateLevelling.json";
             std::ifstream file(configPath);
             if (!file.is_open()) return 10;
             nlohmann::json j;
@@ -51,14 +51,14 @@ namespace {
         auto spikeDir = *logDir / "Spike";
         std::filesystem::create_directories(spikeDir);
 
-        // Build timestamped filename: ExperienceAndAttributes_2026-03-27_10-26-21.log
+        // Build timestamped filename: SimpleAlternateLevelling_2026-03-27_10-26-21.log
         auto now  = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
         std::tm tm{};
         localtime_s(&tm, &time);
         std::ostringstream ts;
         ts << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
-        auto logFilename = std::format("ExperienceAndAttributes_{}.log", ts.str());
+        auto logFilename = std::format("SimpleAlternateLevelling_{}.log", ts.str());
         auto logPath     = spikeDir / logFilename;
 
         // Mirror sink: project Logs folder for direct access during development
@@ -88,7 +88,7 @@ namespace {
             for (const auto& entry : std::filesystem::directory_iterator(dir)) {
                 if (!entry.is_regular_file()) continue;
                 auto name = entry.path().filename().string();
-                if (name.starts_with("ExperienceAndAttributes_") && name.ends_with(".log")) {
+                if (name.starts_with("SimpleAlternateLevelling_") && name.ends_with(".log")) {
                     logFiles.push_back(entry.path());
                 }
             }
@@ -347,7 +347,7 @@ namespace {
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
     InitializeLog();
-    logger::info("[EA] ExperienceAndAttributes loaded successfully. Version 0.1.0");
+    logger::info("[EA] SimpleAlternateLevelling loaded successfully. Version 0.1.0");
 
     SKSE::Init(a_skse);
 

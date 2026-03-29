@@ -7,14 +7,14 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # ---- Project ----
 
 project(
-    ExperienceAndAttributes
+    SimpleAlternateLevelling
     VERSION 0.1.0
     LANGUAGES CXX
 )
 
 # ---- Options ----
 
-set(SKYRIM_PATH "" CACHE PATH "Path to MO2 mod folder, e.g. C:/Modlist/NGVO/mods/Experience and Attributes")
+set(SKYRIM_PATH "" CACHE PATH "Path to MO2 mod folder, e.g. C:/Modlist/NGVO/mods/Simple Alternate Levelling")
 
 # ---- CommonLibSSE-NG setup ----
 

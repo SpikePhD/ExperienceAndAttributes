@@ -16,7 +16,7 @@ namespace EA::Config {
     static std::filesystem::path ResolveConfigPath() {
         wchar_t buf[REX::W32::MAX_PATH] = {};
         REX::W32::GetModuleFileNameW(REX::W32::GetCurrentModule(), buf, REX::W32::MAX_PATH);
-        return std::filesystem::path(buf).parent_path() / "ExperienceAndAttributes.json";
+        return std::filesystem::path(buf).parent_path() / "SimpleAlternateLevelling.json";
     }
 
     // Safely read a float from nested JSON, fall back to defaultVal if any key is missing
@@ -222,12 +222,12 @@ namespace EA::Config {
         try {
             std::ifstream dumpFile(configPath);
             if (dumpFile.is_open()) {
-                logger::info("[EA] Config: --- BEGIN ExperienceAndAttributes.json ---");
+                logger::info("[EA] Config: --- BEGIN SimpleAlternateLevelling.json ---");
                 std::string line;
                 while (std::getline(dumpFile, line)) {
                     logger::info("[EA] Config: {}", line);
                 }
-                logger::info("[EA] Config: --- END ExperienceAndAttributes.json ---");
+                logger::info("[EA] Config: --- END SimpleAlternateLevelling.json ---");
             }
         } catch (...) {
             logger::warn("[EA] Config: Could not dump JSON contents to log.");

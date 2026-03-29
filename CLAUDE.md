@@ -1,4 +1,4 @@
-# Experience and Attributes — CLAUDE.md
+# SimpleAlternateLevelling — CLAUDE.md
 
 ## What this mod does
 
@@ -12,17 +12,20 @@ grinding individual skills. Skill XP is intercepted and discarded at the engine 
 ```
 SKSEPluginLoad()
 ├── InitializeLog()          — timestamped spdlog, mirrored to Logs/ + SKSE/Spike/
-├── Config::Load()           — reads ExperienceAndAttributes.json immediately
-├── Serialization callbacks  — cosave v3: persists s_currentXP across saves
+├── Config::Load()           — reads SimpleAlternateLevelling.json immediately
+├── Serialization callbacks  — cosave v5: persists s_currentXP + skillsNormalized across saves
 └── MessagingInterface kDataLoaded
     ├── SkillHook::Install()          — trampolines into PlayerCharacter::AddSkillExperience
     │                                   (discards all organic skill XP) and
-    │                                   TESObjectBOOK::Read (book XP via deferred task)
+    │                                   TESObjectBOOK::Activate (book XP via deferred task)
     ├── EventSinks::Register()        — BSTEventSink registrations:
     │   ├── TESTrackedStatsEvent      — locations, dungeons, locks, skill books,
     │   │                               misc quests, pickpocket, level-up threshold clamp
     │   ├── TESDeathEvent             — kill XP, per-type (keyword-based), level-delta bonus
-    │   └── TESQuestStageEvent        — quest completion XP by type (main/side/faction/…)
+    │   ├── TESQuestStageEvent        — quest completion XP by type (main/side/faction/…)
+    │   └── TESLockChangedEvent       — caches lock difficulty for the "Locks Picked" stat handler
+    ├── CharCreateWatcher             — MenuOpenCloseEvent sink; fires NormalizeSkills after
+    │                                   "RaceSex Menu" or "RaceMenu" closes on a new game
     └── GameSettingCollection        — overrides fXPLevelUpBase + fXPLevelUpMult to match
                                        Config curve; also writes levelThreshold directly
                                        (stored value is baked at char creation, not updated
@@ -33,13 +36,13 @@ SKSEPluginLoad()
 
 | File | Role |
 |---|---|
-| `src/main.cpp` | Plugin entry, log init, cosave callbacks, kDataLoaded orchestration |
+| `src/main.cpp` | Plugin entry, log init, cosave callbacks, kDataLoaded orchestration, CharCreateWatcher |
 | `src/Config.cpp` / `include/Config.h` | JSON loader; all XP values as `inline` globals |
 | `src/XPManager.cpp` / `include/XPManager.h` | `AwardXP()` (native XP bucket feed), kill/quest dedup guards, cosave accessors |
-| `src/SkillHook.cpp` / `include/SkillHook.h` | `write_branch<5>` hooks: AddSkillExperience (discard), TESObjectBOOK::Read (book XP) |
+| `src/SkillHook.cpp` / `include/SkillHook.h` | `write_branch<5>` hooks: AddSkillExperience (discard), TESObjectBOOK::Activate (book XP) |
 | `src/EventSinks.cpp` / `include/EventSinks.h` | All BSTEventSink structs + `Register()` |
 | `include/PCH.h` | Precompiled header — RE/Skyrim.h, SKSE, spdlog sinks, std includes |
-| `data/SKSE/Plugins/ExperienceAndAttributes.json` | Runtime config (XP values, leveling curve, debug flags) |
+| `data/SKSE/Plugins/SimpleAlternateLevelling.json` | Runtime config (XP values, leveling curve, debug flags) |
 
 ### XP flow
 
@@ -67,10 +70,10 @@ settings alone — it must be written directly).
 
 ### Cosave
 
-- Record ID: `'EAXP'`, version 3
-- Payload: one `float` — cumulative XP this playthrough
+- Record ID: `'EAXP'`, version 5
+- Payload: `float` (cumulative XP) + `int` (pendingSkillPoints) + `uint8` (skillsNormalized)
 - On load: restores `skills->data->xp` and recalculates `levelThreshold`
-- v1/v2 had additional fields (trackedLevel, pendingLevelUps); intentionally not read
+- v1–v4 fields read with version guards; v5 adds `skillsNormalized`
 
 ### Hook addresses (AE 1.6.1170)
 
@@ -101,6 +104,8 @@ original is called — `Read()` is called internally by `Activate`.
 - `QUEST_DATA::Type::kCompanions` does not exist — use `kCompanionsQuest`
 - `TESActorValueChangeEvent` and `TESPerkEntryRunEvent` have no struct definitions in this
   CommonLibSSE-NG build; those sinks are commented out
+- CharCreateWatcher keys off `"RaceSex Menu"` (vanilla/NGVO) OR `"RaceMenu"` (RaceMenu mod)
+  for new-game skill reset; `kPostLoadGame` is NOT used as the trigger
 
 ## Build
 
@@ -109,13 +114,13 @@ cmake -B build -S . \
   "-DCMAKE_TOOLCHAIN_FILE=C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake" \
   -DVCPKG_TARGET_TRIPLET=x64-windows \
   -DCMAKE_BUILD_TYPE=Release \
-  "-DSKYRIM_PATH=C:/Modlist/NGVO/mods/Experience and Attributes" \
+  "-DSKYRIM_PATH=C:/Modlist/NGVO/mods/Simple Alternate Levelling" \
   -DBUILD_TESTS=OFF
 
 cmake --build build --config Release
 ```
 
-DLL is auto-copied to `C:\Modlist\NGVO\mods\Experience and Attributes\SKSE\Plugins\`
+DLL is auto-copied to `C:\Modlist\NGVO\mods\Simple Alternate Levelling\SKSE\Plugins\`
 on a successful build (CMake post-build step).
 
 **CRITICAL**: `CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"` must be
@@ -129,11 +134,11 @@ Use triplet `x64-windows` (not `x64-windows-static` — causes LNK2038 mismatch 
 | Thing | Path |
 |---|---|
 | Source | `C:\Users\lucac\Documents\MyProjects\Experience and Attributes\` |
-| Build output | `build\Release\ExperienceAndAttributes.dll` |
-| Deploy target | `C:\Modlist\NGVO\mods\Experience and Attributes\SKSE\Plugins\` |
-| SKSE log (game) | `Documents\My Games\Skyrim Special Edition\SKSE\Spike\ExperienceAndAttributes_<ts>.log` |
-| Dev log mirror | `<project root>\Logs\ExperienceAndAttributes_<ts>.log` |
-| Config (game) | `<Skyrim>\Data\SKSE\Plugins\ExperienceAndAttributes.json` |
+| Build output | `build\Release\SimpleAlternateLevelling.dll` |
+| Deploy target | `C:\Modlist\NGVO\mods\Simple Alternate Levelling\SKSE\Plugins\` |
+| SKSE log (game) | `Documents\My Games\Skyrim Special Edition\SKSE\Spike\SimpleAlternateLevelling_<ts>.log` |
+| Dev log mirror | `<project root>\Logs\SimpleAlternateLevelling_<ts>.log` |
+| Config (game) | `<Skyrim>\Data\SKSE\Plugins\SimpleAlternateLevelling.json` |
 
 ## Environment — tools in PATH
 
@@ -165,8 +170,8 @@ These are launched through MO2 so they see the virtual data folder:
 | **PGPatcher / PCA** | `tools\PGPatcher\`, `tools\PCA\` | Particle/physics patchers |
 
 ## Json for testing
-Make sure that the deployed config JSON at "C:\Modlist\NGVO\mods\Experience and Attributes\SKSE\Plugins\ExperienceAndAttributes.json" has the following:
-Verbose = true 
+Make sure that the deployed config JSON at "C:\Modlist\NGVO\mods\Simple Alternate Levelling\SKSE\Plugins\SimpleAlternateLevelling.json" has the following:
+Verbose = true
   ## This is to enable better logging and diagnosis of eventual issues
  "leveling": {
     "xp_base":     5.0,
