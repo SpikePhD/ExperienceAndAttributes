@@ -66,6 +66,7 @@ namespace EA::Config {
 
     // Skill allocation
     inline int skillPointsPerLevel = 10;
+    inline float skillCap = 200.0f;
 
     // Skill menu UI layout (passed to SWF at runtime)
     inline int menuPanelWidth     = 820;
