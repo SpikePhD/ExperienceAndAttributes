@@ -145,6 +145,7 @@ namespace EA::Config {
         skillPointsPerLevel = static_cast<int>(ReadFloat(j,
             {"skill_allocation", "points_per_level"},
             static_cast<float>(skillPointsPerLevel)));
+        skillCap = ReadFloat(j, {"skill_allocation", "skill_cap"}, skillCap);
 
         // Skill menu UI layout
         menuPanelWidth     = static_cast<int>(ReadFloat(j, {"skill_allocation", "panel_width"},     static_cast<float>(menuPanelWidth)));
@@ -214,6 +215,7 @@ namespace EA::Config {
             skillPointsPerLevel, menuPanelWidth, menuPanelHeight, menuPanelYOffset,
             menuSkillRowGap, menuSkillColumnGap, menuSkillLabelValueGap, menuSkillValueArrowGap,
             menuSkillButtonTopGap, menuSkillButtonGap, menuFontSize, menuHeaderFontSize);
+        logger::info("[EA] Config: Skill cap â€” {:.1f}", skillCap);
         logger::info("[EA] Config: max_log_files={}", maxLogFiles);
         logger::info("[EA] Config: notifications_enabled={}", notificationsEnabled);
         logger::info("[EA] Config: reset_skills_on_new_game={}", resetSkillsOnNewGame);

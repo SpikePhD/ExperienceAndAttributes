@@ -238,9 +238,9 @@ namespace EA::SkillMenu {
         auto* avo = static_cast<RE::Actor*>(player)->AsActorValueOwner();
 
         float current = avo->GetBaseActorValue(a_skill);
-        if (current >= 100.0f) {
-            logger::info("[EA] SkillMenu::AllocatePoint: AV={} already at 100.",
-                static_cast<int>(a_skill));
+        if (current >= EA::Config::skillCap) {
+            logger::info("[EA] SkillMenu::AllocatePoint: AV={} already at cap {:.1f}.",
+                static_cast<int>(a_skill), EA::Config::skillCap);
             return;
         }
 
