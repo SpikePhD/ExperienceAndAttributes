@@ -112,7 +112,7 @@ original is called — `Read()` is called internally by `Activate`.
 ```bash
 cmake -B build -S . \
   "-DCMAKE_TOOLCHAIN_FILE=C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake" \
-  -DVCPKG_TARGET_TRIPLET=x64-windows \
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static-md \
   -DCMAKE_BUILD_TYPE=Release \
   "-DSKYRIM_PATH=C:/Modlist/NGVO/mods/Simple Alternate Levelling" \
   -DBUILD_TESTS=OFF
@@ -123,11 +123,11 @@ cmake --build build --config Release
 DLL is auto-copied to `C:\Modlist\NGVO\mods\Simple Alternate Levelling\SKSE\Plugins\`
 on a successful build (CMake post-build step).
 
-**CRITICAL**: `CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"` must be
-set before `project()` in CMakeLists.txt to force `/MT`. Without it the DLL uses `/MD`
-and fails with error 0x7E at game launch (spdlog.dll / fmt.dll missing).
-
-Use triplet `x64-windows` (not `x64-windows-static` — causes LNK2038 mismatch for DLLs).
+**CRITICAL**: Use triplet `x64-windows-static-md` — this builds spdlog/fmt as static libs
+(no DLLs), uses `/MD` runtime. `CMAKE_MSVC_RUNTIME_LIBRARY` must be set to
+`"MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"` (i.e. `/MD`) before `project()` to match.
+Do NOT use `x64-windows` (gives `spdlog.dll`/`fmt.dll` as shared imports → 0x7E load failure).
+Do NOT use `x64-windows-static` (causes LNK2038 RuntimeLibrary mismatch).
 
 ## Paths
 

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # ---- Static CRT (must be set before project()) ----
 # SKSE plugins must be self-contained; dynamic CRT causes 0x7E load failure.
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 # ---- Project ----
 
@@ -99,12 +99,4 @@ if(SKYRIM_PATH)
         COMMENT "Copying SWF interface to mod folder..."
     )
 
-    # Copy vcpkg runtime DLLs (spdlog, fmt) — required when using x64-windows triplet.
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}>
-            "${SKYRIM_PATH}/SKSE/Plugins/"
-        COMMAND_EXPAND_LISTS
-        COMMENT "Copying runtime DLLs to mod folder..."
-    )
 endif()
