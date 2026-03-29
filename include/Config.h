@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 namespace EA::Config {
 
     // -----------------------------------------------------------------------
@@ -10,6 +13,13 @@ namespace EA::Config {
     // Debug
     inline bool verbose     = false;
     inline int  maxLogFiles = 10;
+
+    // New game
+    inline bool resetSkillsOnNewGame = false;
+
+    // Notifications
+    inline bool notificationsEnabled = true;
+    inline std::unordered_map<std::string, std::string> notificationMessages{};
 
     // Quest XP
     inline float xpQuestMain     = 50.0f;
