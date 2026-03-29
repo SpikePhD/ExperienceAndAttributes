@@ -91,4 +91,11 @@ if(SKYRIM_PATH)
             "${SKYRIM_PATH}/SKSE/Plugins/${PROJECT_NAME}.json"
         COMMENT "Copying JSON config to mod folder..."
     )
+
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/data/Interface/EA_SkillMenu.swf"
+            "${SKYRIM_PATH}/Interface/EA_SkillMenu.swf"
+        COMMENT "Copying SWF interface to mod folder..."
+    )
 endif()
